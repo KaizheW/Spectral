@@ -42,11 +42,9 @@ class NSE:
         return u, v, p
 
     def Heatf(self):
-        # return 2.0*np.ones([self.N, self.N])
         return 2.0*np.sin(self.x)*np.cos(self.y)
 
     def Convectionf(self):
-        # return (2.0-2*np.sin(self.x))*np.cos(self.x)*np.sin(self.y)
         return (2.0*np.cos(self.x)*np.cos(self.y)+2.0)*np.sin(self.x)*np.cos(self.y)
 
     def Getdt(self):
@@ -195,20 +193,74 @@ class NSE:
             A = np.ones([N,N]) - dt*Lk/(2.0*self.Re)
             duk = Bu/A
             dvk = Bv/A
-            du = np.fft.ifft2(np.roll(np.roll(duk, N//2, axis=0), N//2, axis=1))
-            dv = np.fft.ifft2(np.roll(np.roll(dvk, N//2, axis=0), N//2, axis=1))
+            du = np.fft.ifft2(np.roll(np.roll(duk, N//2, axis=0), N//2, axis=1)).real # Real
+            dv = np.fft.ifft2(np.roll(np.roll(dvk, N//2, axis=0), N//2, axis=1)).real # Real
             us = u + du
             vs = v + dv
-            usx = (us[:,self.ip] - us[:,self.im])/(2*self.dx)
-            vsy = (vs[self.ip,:] - vs[self.im,:])/(2*self.dy)
-            usxk = np.roll(np.roll(np.fft.fft2(usx/dt), N//2, axis=0), N//2, axis=1)
-            vsyk = np.roll(np.roll(np.fft.fft2(vsy/dt), N//2, axis=0), N//2, axis=1)
-            Qk = usxk + vsyk
+            # usx = (us[:,self.ip] - us[:,self.im])/(2*self.dx)
+            usx = (us[:,self.ip] - us)/(self.dx)
+            # vsy = (vs[self.ip,:] - vs[self.im,:])/(2*self.dy)
+            vsy = (vs[self.ip,:] - vs)/(self.dy)
+            Qk = np.roll(np.roll(np.fft.fft2((usx+vsy)/dt), N//2, axis=0), N//2, axis=1)
             Qk[N//2, N//2] = 0.0
             phik = Qk/Lk
-            phi = np.fft.ifft2(np.roll(np.roll(phik, N//2, axis=0), N//2, axis=1))
-            u = us - dt*(phi[:, self.ip] - phi[:, self.im])/(2.0*self.dx)
-            v = vs - dt*(phi[self.ip, :] - phi[self.im, :])/(2.0*self.dy)
+            phi = np.fft.ifft2(np.roll(np.roll(phik, N//2, axis=0), N//2, axis=1)).real # Real
+            # u = us - dt*(phi[:, self.ip] - phi[:, self.im])/(2.0*self.dx)
+            u = us - dt*(phi - phi[:, self.im])/(self.dx)
+            # v = vs - dt*(phi[:, self.ip] - phi[self.im, :])/(2.0*self.dy)
+            v = vs - dt*(phi - phi[self.im, :])/(self.dy)
+            p = p + phi - 0.5*dt*self.Laplace(phi)/self.Re
+            Hnu1 = np.copy(Hnu)
+            Hnv1 = np.copy(Hnv)
+            Hnu1k = np.copy(Hnuk)
+            Hnv1k = np.copy(Hnvk)
+            Hnu = self.Hu(u,v)
+            Hnv = self.Hv(u,v)
+            self.t = self.t + dt
+            print self.t
+        return u,v
+    
+    def NSEMAIN2(self, u, v, p):
+        N = self.N
+        Hnu = self.Hu(u,v)
+        Hnv = self.Hv(u,v)
+        Hnu1 = self.Hu(u,v)
+        Hnv1 = self.Hv(u,v)
+        Hnu1k = np.roll(np.roll(np.fft.fft2(Hnu1), N//2, axis=0), N//2, axis=1)
+        Hnv1k = np.roll(np.roll(np.fft.fft2(Hnv1), N//2, axis=0), N//2, axis=1)
+        Lk = self.LaplaceFFT()
+        Dxk = self.dxFFT()
+        Dyk = self.dyFFT()
+        while self.t < self.tfinal:
+            dt = self.GetnNSdt(u,v)
+            if self.t + dt > self.tfinal:
+                dt = self.tfinal - self.t
+            pk = np.roll(np.roll(np.fft.fft2(p), N//2, axis=0), N//2, axis=1)
+            Hnuk = np.roll(np.roll(np.fft.fft2(Hnu), N//2, axis=0), N//2, axis=1)
+            Hnvk = np.roll(np.roll(np.fft.fft2(Hnv), N//2, axis=0), N//2, axis=1)
+            uk = np.roll(np.roll(np.fft.fft2(u), N//2, axis=0), N//2, axis=1)
+            vk = np.roll(np.roll(np.fft.fft2(v), N//2, axis=0), N//2, axis=1)
+            Bu = dt*(- Dxk*pk + 1.5*Hnuk - 0.5*Hnu1k + Lk*uk/self.Re)
+            Bv = dt*(- Dyk*pk + 1.5*Hnvk - 0.5*Hnv1k + Lk*vk/self.Re)
+            Bu[N//2, N//2] = 0.0
+            Bv[N//2, N//2] = 0.0
+            A = np.ones([N,N]) - dt*Lk/(2.0*self.Re)
+            duk = Bu/A
+            dvk = Bv/A
+            du = np.fft.ifft2(np.roll(np.roll(duk, N//2, axis=0), N//2, axis=1)).real # Real
+            dv = np.fft.ifft2(np.roll(np.roll(dvk, N//2, axis=0), N//2, axis=1)).real # Real
+            us = u + du
+            vs = v + dv
+            usk = np.roll(np.roll(np.fft.fft2(us), N//2, axis=0), N//2, axis=1)
+            vsk = np.roll(np.roll(np.fft.fft2(vs), N//2, axis=0), N//2, axis=1)
+            Qk = (Dxk*usk+Dyk*vsk)/dt
+            Qk[N//2, N//2] = 0.0
+            phik = Qk/Lk
+            phi = np.fft.ifft2(np.roll(np.roll(phik, N//2, axis=0), N//2, axis=1)).real # Real
+            # u = us - dt*(phi[:, self.ip] - phi[:, self.im])/(2.0*self.dx)
+            u = us - dt*(phi - phi[:, self.im])/(self.dx)
+            # v = vs - dt*(phi[:, self.ip] - phi[self.im, :])/(2.0*self.dy)
+            v = vs - dt*(phi - phi[self.im, :])/(self.dy)
             p = p + phi - 0.5*dt*self.Laplace(phi)/self.Re
             Hnu1 = np.copy(Hnu)
             Hnv1 = np.copy(Hnv)
@@ -221,7 +273,7 @@ class NSE:
         return u,v
 
 
-solver = NSE(256,1.05,0.2)
+solver = NSE(256,0.8,0.5)
 u, v, p = solver.InitialKH()
 u, v = solver.NSEMAIN(u,v,p)
 # print u,v
