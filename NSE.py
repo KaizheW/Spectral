@@ -14,6 +14,8 @@ class NSE:
         self.kx, self.ky = np.meshgrid(np.arange(-N//2, N//2), np.arange(-N//2, N//2))
         self.dx = 2*pi/N
         self.dy = 2*pi/N
+        self.Lx = 2*pi
+        self.Ly = 2*pi
         self.ip = np.arange(N)+1
         self.ip[N-1] = 0
         # self.jp = np.arange(N)+1
@@ -39,6 +41,30 @@ class NSE:
         u2 = Ax * np.sin(2*pi*self.x/Lambda)
         u = u1*(np.ones([self.N, self.N])+u2)
         p = np.zeros([self.N, self.N])
+        return u, v, p
+
+    def InitialVortex(self):
+        self.Re = 1000.0
+        self.Pe = 1000.0
+        psi01 = 1.0
+        psi02 = -1.0
+        xv1 = self.Lx/4.0
+        yv1 = self.Ly/2.0+1.4
+        xv2 = self.Lx/4.0
+        yv2 = self.Ly/2.0-1.4
+        lv1 = 0.4*np.sqrt(2)*np.min([xv1, yv1, self.Lx-xv1, self.Ly-yv1])
+        lv2 = 0.4*np.sqrt(2)*np.min([xv1, yv1, self.Lx-xv2, self.Ly-yv2])
+        psi1 = psi01*np.exp(-((self.x - np.ones([self.N, self.N])*xv1)**2 \
+        + (self.y - np.ones([self.N, self.N])*yv1)**2)/lv1**2)
+        psi2 = psi02*np.exp(-((self.x - np.ones([self.N, self.N])*xv2)**2 \
+        + (self.y - np.ones([self.N, self.N])*yv2)**2)/lv2**2)
+        u = -2*(self.y-np.ones([self.N, self.N])*yv1)*psi1/lv1**2 \
+        - 2*(self.y-np.ones([self.N, self.N])*yv2)*psi2/lv2**2
+        v = 2*(self.x-np.ones([self.N, self.N])*xv1)*psi1/lv1**2 \
+        + 2*(self.x-np.ones([self.N, self.N])*yv2)*psi2/lv2**2
+        p = np.zeros([self.N, self.N])
+        # plt.quiver(self.x, self.y, u, v)
+        # plt.show()
         return u, v, p
 
     def Heatf(self):
@@ -219,7 +245,7 @@ class NSE:
             self.t = self.t + dt
             print self.t
         return u,v
-    
+
     def NSEMAIN2(self, u, v, p):
         N = self.N
         Hnu = self.Hu(u,v)
@@ -273,8 +299,9 @@ class NSE:
         return u,v
 
 
-solver = NSE(256,0.8,0.5)
-u, v, p = solver.InitialKH()
+solver = NSE(128,20.0,0.5)
+# u, v, p = solver.InitialKH()
+u, v, p = solver.InitialVortex()
 u, v = solver.NSEMAIN(u,v,p)
 # print u,v
 w = solver.Vorticity(u, v)
