@@ -26,6 +26,7 @@ class NSE:
         # self.jm[0] = N-1
         self.ic = np.arange(N)
         # self.jc = np.arange(N)
+        self.imgcount = 0
 
     def InitialKH(self):
         self.Re = 1000.0
@@ -244,6 +245,11 @@ class NSE:
             Hnv = self.Hv(u,v)
             self.t = self.t + dt
             print self.t
+            # self.imgcount += 1
+            # if np.mod(self.imgcount,20) == 0:
+            #     w = self.Vorticity(u, v)
+            #     plt.imshow(w.real, animated=True)
+            #     fig.savefig('KH/KH_'+str(int(self.imgcount/10))+'.jpg')
         return u,v
 
     def NSEMAIN2(self, u, v, p):
@@ -299,11 +305,15 @@ class NSE:
         return u,v
 
 
-solver = NSE(128,20.0,0.5)
-# u, v, p = solver.InitialKH()
-u, v, p = solver.InitialVortex()
+fig = plt.figure()
+solver = NSE(512, 10.0, 0.5)
+u, v, p = solver.InitialKH()
+# u, v, p = solver.InitialVortex()
 u, v = solver.NSEMAIN(u,v,p)
 # print u,v
-w = solver.Vorticity(u, v)
-plt.imshow(w.real)
-plt.show()
+# w = solver.Vorticity(u, v)
+# plt.imshow(w.real)
+# plt.savefig('KH_'+str(solver.t)+'.pdf')
+# plt.savefig('VT_'+str(solver.t)+'.pdf')
+# plt.colorbar()
+# plt.show()
